@@ -1,4 +1,5 @@
 {
+  "name":"mine-sweeper",
   "private": true,
   "scripts": {
     "dev": "umi dev",
