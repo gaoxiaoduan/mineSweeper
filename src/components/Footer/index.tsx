@@ -1,9 +1,8 @@
-import { ThemeContext } from '@/layouts/index';
-import React, { memo, useContext } from 'react';
+import { useDark } from '@/hooks';
+import React, { memo } from 'react';
 
 const Footer = memo(() => {
-  const { dark, toggleDark } = useContext(ThemeContext);
-
+  const { dark, toggleDark } = useDark();
   return (
     <div>
       <button onClick={toggleDark}>button</button>
