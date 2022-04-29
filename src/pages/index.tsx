@@ -1,4 +1,4 @@
-import { IcBaselineAcUnit } from '@/components/icons/IcBaselineAcUnit';
+import { IcBaselineAcUnit, IcFlag } from '@/components/icons';
 import React, { memo, useState } from 'react';
 import Footer from '../components/Footer';
 export interface BlockState {
@@ -36,8 +36,8 @@ const dev = true;
 let fistClick = true; // 标记是否为第一次点击
 
 const index = memo(() => {
-  const WIGHT = 10;
-  const HEIGHT = 10;
+  const WIGHT = 5;
+  const HEIGHT = 5;
   const [state, setState] = useState(
     Array.from({ length: HEIGHT }, (_, y) =>
       Array.from(
@@ -110,14 +110,9 @@ const index = memo(() => {
       .filter(Boolean) as BlockState[];
   };
 
-  const setClassName = (block: BlockState) => {
-    if (!block.revealed) {
-      return 'bg-gray-400/30';
-    }
-    return block.mine ? 'bg-red-300/80' : numberColor[block.adjacentMines];
-  };
-
   const handleBlockClick = (block: BlockState) => {
+    if (block.flagged) return;
+
     if (fistClick) {
       generateMines(block);
     }
@@ -127,18 +122,63 @@ const index = memo(() => {
       revealEmptyBlocks(block);
       setState([...state]);
     }
+
+    checkGameState();
+
+    if (block.mine) {
+      setTimeout(() => {
+        alert('游戏结束');
+      });
+      return;
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, block: BlockState) => {
+    e.preventDefault();
+    state[block.y][block.x].flagged = !block.flagged;
+    setState([...state]);
+    checkGameState();
+  };
+
+  const checkGameState = () => {
+    const flats = state.flat();
+
+    if (!flats.some((block) => !block.mine && !block.revealed)) {
+      setTimeout(() => {
+        alert('游戏胜利');
+      });
+    }
+  };
+
+  const setClassName = (block: BlockState) => {
+    if (block.flagged) {
+      return 'bg-red-400/30';
+    }
+    if (!block.revealed) {
+      return 'bg-gray-400/30 hover:bg-gray-400/50';
+    }
+    return block.mine ? 'bg-red-400/30' : numberColor[block.adjacentMines];
+  };
+
+  const handleContent = (block: BlockState): React.ReactNode => {
+    if (block.flagged) {
+      return <IcFlag />;
+    }
+    if (block.revealed || dev) {
+      return block.mine ? <IcBaselineAcUnit /> : block.adjacentMines;
+    }
   };
 
   const setBlockButtons = (block: BlockState) => {
     return (
       <button
         key={block.x}
-        className={`flex justify-center items-center w-9 h-9 m-0.5 border text-center hover:bg-gray-400/50 dark:border-gray-400/30 
+        className={`flex justify-center items-center w-9 h-9 m-0.5 border text-center  dark:border-gray-400/30 
         ${setClassName(block)} `}
         onClick={() => handleBlockClick(block)}
+        onContextMenu={(e) => handleContextMenu(e, block)}
       >
-        {(block.revealed || dev) &&
-          (block.mine ? <IcBaselineAcUnit /> : block.adjacentMines)}
+        {handleContent(block)}
       </button>
     );
   };
