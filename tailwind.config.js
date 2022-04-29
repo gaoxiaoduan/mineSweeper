@@ -5,4 +5,4 @@ module.exports = {
     './src/components/**.tsx',
     './src/layouts/**.tsx',
   ],
-}
+};

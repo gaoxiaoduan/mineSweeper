@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .btn {
+    @apply flex items-center justify-center px-4 py-1 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700  md:py-1 md:text-lg md:px-4;
+  }
+}
+
+

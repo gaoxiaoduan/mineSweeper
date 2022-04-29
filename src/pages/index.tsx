@@ -1,14 +1,8 @@
 import { IcBaselineAcUnit, IcFlag } from '@/components/icons';
+import { Game } from '@/composables';
+import type { BlockState, GameState } from '@/types';
 import React, { memo, useState } from 'react';
 import Footer from '../components/Footer';
-export interface BlockState {
-  x: number;
-  y: number;
-  revealed: boolean; // 是否翻转
-  mine?: boolean; // 是否是雷
-  flagged?: boolean; // 是否标记
-  adjacentMines: number; // 周围雷的数量
-}
 
 const numberColor = [
   'text-transparent',
@@ -21,109 +15,24 @@ const numberColor = [
   'text-orange-900',
 ];
 
-const direction = [
-  [-1, -1],
-  [-1, 0],
-  [-1, 1],
-  [0, -1],
-  [0, 1],
-  [1, -1],
-  [1, 0],
-  [1, 1],
-];
-
-const dev = true;
-let fistClick = true; // 标记是否为第一次点击
-
+let game = new Game(6, 6);
 const index = memo(() => {
-  const WIGHT = 5;
-  const HEIGHT = 5;
-  const [state, setState] = useState(
-    Array.from({ length: HEIGHT }, (_, y) =>
-      Array.from(
-        { length: WIGHT },
-        (_, x): BlockState => ({
-          x,
-          y,
-          revealed: false,
-          adjacentMines: 0,
-        }),
-      ),
-    ),
-  );
-
-  // 生成炸弹
-  const generateMines = (initialBlock: BlockState): void => {
-    for (const row of state) {
-      for (const block of row) {
-        if (
-          Math.abs(initialBlock.y - block.y) < 1 &&
-          Math.abs(initialBlock.x - block.x) < 1
-        ) {
-          // 保证首次点击不会点中炸弹
-          continue;
-        }
-        block.mine = Math.random() < 0.1;
-      }
-    }
-
-    updateAdjacentMines();
-    fistClick = false;
-  };
-
-  // 生成周围雷的数量
-  const updateAdjacentMines = (): void => {
-    state.forEach((row, y) => {
-      row.forEach((block, x) => {
-        if (block.mine) return;
-        getSiblings(block).forEach((item) => {
-          if (item.mine) {
-            block.adjacentMines += 1;
-          }
-        });
-      });
-    });
-    setState([...state]);
-  };
-
-  // 翻开为0的方块
-  const revealEmptyBlocks = (block: BlockState): void => {
-    if (block.adjacentMines) return;
-    getSiblings(block).forEach((item) => {
-      if (item.revealed) return;
-      item.revealed = true;
-      revealEmptyBlocks(item);
-    });
-  };
-
-  // 获取边界
-  const getSiblings = (block: BlockState) => {
-    return direction
-      .map(([dx, dy]) => {
-        const x2 = block.x + dx;
-        const y2 = block.y + dy;
-        if (x2 >= 0 && x2 < WIGHT && y2 >= 0 && y2 < HEIGHT) {
-          return state[y2][x2];
-        }
-        return undefined;
-      })
-      .filter(Boolean) as BlockState[];
-  };
+  const [state, setState] = useState<GameState>(game.state);
 
   const handleBlockClick = (block: BlockState) => {
     if (block.flagged) return;
 
-    if (fistClick) {
-      generateMines(block);
+    if (game.state.fistClick) {
+      game.generateMines(block);
     }
 
     if (!block.revealed) {
-      state[block.y][block.x].revealed = true;
-      revealEmptyBlocks(block);
-      setState([...state]);
+      state.block[block.y][block.x].revealed = true;
+      game.revealEmptyBlocks(block);
+      setState({ ...state });
     }
 
-    checkGameState();
+    game.checkGameState();
 
     if (block.mine) {
       setTimeout(() => {
@@ -135,18 +44,17 @@ const index = memo(() => {
 
   const handleContextMenu = (e: React.MouseEvent, block: BlockState) => {
     e.preventDefault();
-    state[block.y][block.x].flagged = !block.flagged;
-    setState([...state]);
-    checkGameState();
+    state.block[block.y][block.x].flagged = !block.flagged;
+    setState({ ...state });
+    game.checkGameState();
   };
 
-  const checkGameState = () => {
-    const flats = state.flat();
-
-    if (!flats.some((block) => !block.mine && !block.revealed)) {
-      setTimeout(() => {
-        alert('游戏胜利');
-      });
+  const handleContent = (block: BlockState): React.ReactNode => {
+    if (block.flagged) {
+      return <IcFlag />;
+    }
+    if (block.revealed || state.dev) {
+      return block.mine ? <IcBaselineAcUnit /> : block.adjacentMines;
     }
   };
 
@@ -158,15 +66,6 @@ const index = memo(() => {
       return 'bg-gray-400/30 hover:bg-gray-400/50';
     }
     return block.mine ? 'bg-red-400/30' : numberColor[block.adjacentMines];
-  };
-
-  const handleContent = (block: BlockState): React.ReactNode => {
-    if (block.flagged) {
-      return <IcFlag />;
-    }
-    if (block.revealed || dev) {
-      return block.mine ? <IcBaselineAcUnit /> : block.adjacentMines;
-    }
   };
 
   const setBlockButtons = (block: BlockState) => {
@@ -183,11 +82,49 @@ const index = memo(() => {
     );
   };
 
+  // 调整等级
+  const adjustmentLevel = (level: 'reset' | 'easy' | 'medium' | 'hard') => {
+    switch (level) {
+      case 'reset':
+        game.reset();
+        break;
+      case 'easy':
+        game.reset(9, 9);
+        break;
+      case 'medium':
+        game.reset(16, 16);
+        break;
+      case 'hard':
+        game.reset(30, 16);
+        break;
+      default:
+        game.reset();
+        break;
+    }
+    setState(game.state);
+  };
+
   return (
-    <main className="h-[100vh] bg-white dark:bg-black font-sans p-8 text-center text-gray-700 dark:text-white">
-      <h1 className="text-3xl font-bold">mine-sweeper</h1>
+    <main className="h-screen overflow-auto bg-white dark:bg-black font-sans p-8 text-center text-gray-700 dark:text-white">
+      <h1 className="text-4xl font-bold">mine-sweeper</h1>
+      {console.log('render')}
+      <div className="flex justify-center gap-1 p-3">
+        <button className="btn" onClick={() => adjustmentLevel('reset')}>
+          New Game
+        </button>
+        <button className="btn" onClick={() => adjustmentLevel('easy')}>
+          Easy
+        </button>
+        <button className="btn" onClick={() => adjustmentLevel('medium')}>
+          Medium
+        </button>
+        <button className="btn" onClick={() => adjustmentLevel('hard')}>
+          Hard
+        </button>
+      </div>
+
       <div className="p-5">
-        {state.map((row, y) => (
+        {state.block.map((row, y) => (
           <div key={y} className="flex justify-center">
             {row.map((item, x) => setBlockButtons(item))}
           </div>
