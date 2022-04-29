@@ -1,5 +1,5 @@
 import { IcBaselineAcUnit, IcFlag } from '@/components/icons';
-import { Game,winRitual } from '@/composables';
+import { Game } from '@/composables';
 import type { BlockState, GameState } from '@/types';
 import { useLocalStorageState } from 'ahooks';
 import React, { memo } from 'react';
@@ -23,7 +23,6 @@ const index = memo(() => {
   });
 
   const onclick = (block: BlockState) => {
-    winRitual();
     game.handleBlockClick(block);
     setState({ ...game.state });
   };
