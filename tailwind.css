@@ -6,6 +6,40 @@
   .btn {
     @apply flex items-center justify-center px-4 py-1 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700  md:py-1 md:text-lg md:px-4;
   }
+
+  .bg-light {
+    background-image: linear-gradient(
+      to right top,
+      #c446d1,
+      #ae4dd6,
+      #9753da,
+      #7d57dc,
+      #5e5bdd,
+      #4e56d6,
+      #3d51ce,
+      #274cc7,
+      #2d3fb7,
+      #3031a8,
+      #312298,
+      #311288
+    );
+  }
+
+  .bg-dark {
+    background-image: linear-gradient(
+      to left top,
+      #3733ae,
+      #00409a,
+      #003c70,
+      #003143,
+      #002323,
+      #071e19,
+      #0b1912,
+      #0c130b,
+      #12160d,
+      #17180e,
+      #1c1a10,
+      #211c12
+    );
+  }
 }
-
-

@@ -8,7 +8,9 @@
     "start": "npm run dev"
   },
   "dependencies": {
+    "@types/canvas-confetti": "^1.4.2",
     "ahooks": "^3.3.10",
+    "canvas-confetti": "^1.5.1",
     "umi": "^4.0.0-rc.13"
   },
   "devDependencies": {

@@ -7,10 +7,13 @@ export interface BlockState {
   adjacentMines: number; // 周围雷的数量
 }
 
+export type gameStatus = 'ready' | 'playing' | 'win' | 'lose';
 export interface GameState {
   block: BlockState[][];
   width: number;
   height: number;
-  fistClick: boolean;
-  dev: boolean;
+  mines: number;
+  mineGenerated?: boolean;
+  gameStatus?: gameStatus;
+  dev?: boolean;
 }

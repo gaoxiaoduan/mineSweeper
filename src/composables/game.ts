@@ -1,5 +1,5 @@
-import type { BlockState, GameState } from '@/types';
-
+import type { BlockState, GameState, gameStatus } from '@/types';
+import { generateConfig, loseSnow, winRitual } from './confetti';
 const direction = [
   [-1, -1],
   [-1, 0],
@@ -13,23 +13,32 @@ const direction = [
 
 export class Game {
   state: GameState = {
-    width: 0,
-    height: 0,
+    width: 9,
+    height: 9,
+    mines: 10,
     block: [],
-    fistClick: true, //标记是否为第一次点击
-    dev: false, //开发者模式
   };
 
-  constructor(width: number, height: number) {
-    this.reset(width, height);
+  constructor(width: number, height: number, mines: number) {
+    this.reset(width, height, mines);
   }
 
-  reset(width = this.state.width, height = this.state.height) {
+  get blocks() {
+    return this.state.block.flat();
+  }
+
+  reset(
+    width = this.state.width,
+    height = this.state.height,
+    mines = this.state.mines,
+  ) {
     this.state = {
       width,
       height,
-      fistClick: true,
-      dev: true, // 开发者模式
+      mines,
+      mineGenerated: false,
+      gameStatus: 'ready', //游戏状态
+      dev: false, // 开发者模式
       block: Array.from({ length: height }, (_, y) =>
         Array.from(
           { length: width },
@@ -44,23 +53,104 @@ export class Game {
     };
   }
 
-  // 生成炸弹
-  generateMines = (initialBlock: BlockState): void => {
-    for (const row of this.state.block) {
-      for (const block of row) {
-        if (
-          Math.abs(initialBlock.y - block.y) < 1 &&
-          Math.abs(initialBlock.x - block.x) < 1
-        ) {
-          // 保证首次点击不会点中炸弹
-          continue;
-        }
-        block.mine = Math.random() < 0.1;
-      }
+  // 点击事件
+  handleBlockClick = (block: BlockState) => {
+    if (this.state.gameStatus === 'ready') {
+      this.state.gameStatus = 'playing';
     }
 
+    if (this.state.gameStatus !== 'playing' || block.flagged) return;
+
+    if (!this.state.mineGenerated) {
+      this.generateMines(block);
+      this.state.mineGenerated = true;
+    }
+
+    if (!block.revealed) {
+      this.state.block[block.y][block.x].revealed = true;
+    }
+
+    this.checkGameState();
+
+    if (block.mine) {
+      this.gameOver('lose');
+      return;
+    }
+
+    this.revealEmptyBlocks(block);
+  };
+
+  // 鼠标右键点击事件
+  handleContextMenu = (block: BlockState) => {
+    if (this.state.gameStatus !== 'playing') return;
+    this.state.block[block.y][block.x].flagged = !block.flagged;
+    this.checkGameState();
+  };
+
+  mineReset = () => {
+    if (!this.state.mineGenerated) {
+      return this.state.mines;
+    }
+    return this.blocks.reduce(
+      (a, b) => a - (b.flagged ? 1 : 0),
+      this.state.mines,
+    );
+  };
+
+  // 双击自动展开
+  autoExpand = (block: BlockState) => {
+    if (this.state.gameStatus !== 'playing' || block.flagged) return;
+
+    const siblings = this.getSiblings(block);
+    const flags = siblings.reduce((a, b) => a + (b.flagged ? 1 : 0), 0);
+    const notRevealed = siblings.reduce(
+      (a, b) => a + (!b.revealed && !b.flagged ? 1 : 0),
+      0,
+    );
+    if (flags === block.adjacentMines) {
+      siblings.forEach((i) => {
+        if (i.revealed || i.flagged) return;
+        i.revealed = true;
+        this.revealEmptyBlocks(i);
+        if (i.mine) this.gameOver('lose');
+      });
+    }
+    const missingFlags = block.adjacentMines - flags;
+    if (notRevealed === missingFlags) {
+      siblings.forEach((i) => {
+        if (!i.revealed && !i.flagged) i.flagged = true;
+      });
+    }
+  };
+
+  // 生成范围
+  generateRangeInt(min: number, max: number) {
+    return Math.round(Math.random() * (max - min) + min);
+  }
+
+  // 生成炸弹
+  generateMines = (initialBlock: BlockState): void => {
+    const randomGenerator = () => {
+      const x = this.generateRangeInt(0, this.state.width - 1);
+      const y = this.generateRangeInt(0, this.state.height - 1);
+      const block = this.state.block[y][x];
+      if (
+        Math.abs(initialBlock.y - block.y) < 1 &&
+        Math.abs(initialBlock.x - block.x) < 1
+      ) {
+        return false;
+      }
+      if (block.mine) return false;
+      block.mine = true;
+      return true;
+    };
+
+    // 生成炸弹
+    new Array(this.state.mines).fill(0).forEach(() => {
+      while (!randomGenerator()) {}
+    });
+
     this.updateAdjacentMines();
-    this.state.fistClick = false;
   };
 
   // 生成周围雷的数量
@@ -79,9 +169,11 @@ export class Game {
 
   // 翻开为0的方块
   revealEmptyBlocks = (block: BlockState): void => {
+    if (this.state.gameStatus !== 'playing') return;
     if (block.adjacentMines) return;
     this.getSiblings(block).forEach((item) => {
       if (item.revealed) return;
+      if (item.flagged) return;
       item.revealed = true;
       this.revealEmptyBlocks(item);
     });
@@ -107,9 +199,32 @@ export class Game {
   };
 
   checkGameState = () => {
-    const flats = this.state.block.flat();
+    // const flats = this.state.block.flat();
+    if (!this.blocks.some((block) => !block.mine && !block.revealed)) {
+      this.gameOver('win');
+    }
+  };
 
-    if (!flats.some((block) => !block.mine && !block.revealed)) {
+  showAllMines = () => {
+    this.blocks.forEach((block) => {
+      if (block.mine) {
+        block.revealed = true;
+      }
+    });
+  };
+
+  gameOver = (status: gameStatus) => {
+    this.state.gameStatus = status;
+    if (status === 'lose') {
+      this.showAllMines();
+      generateConfig();
+      loseSnow();
+      setTimeout(() => {
+        alert('游戏结束');
+      }, 500);
+    } else if (status === 'win') {
+      this.state.gameStatus = 'win';
+      winRitual();
       setTimeout(() => {
         alert('游戏胜利');
       });

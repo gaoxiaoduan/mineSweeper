@@ -1,7 +1,8 @@
 import { IcBaselineAcUnit, IcFlag } from '@/components/icons';
-import { Game } from '@/composables';
+import { Game,winRitual } from '@/composables';
 import type { BlockState, GameState } from '@/types';
-import React, { memo, useState } from 'react';
+import { useLocalStorageState } from 'ahooks';
+import React, { memo } from 'react';
 import Footer from '../components/Footer';
 
 const numberColor = [
@@ -15,38 +16,27 @@ const numberColor = [
   'text-orange-900',
 ];
 
-let game = new Game(6, 6);
+let game = new Game(9, 9, 10);
 const index = memo(() => {
-  const [state, setState] = useState<GameState>(game.state);
+  const [state, setState] = useLocalStorageState<GameState>('mineSweeper', {
+    defaultValue: game.state,
+  });
 
-  const handleBlockClick = (block: BlockState) => {
-    if (block.flagged) return;
-
-    if (game.state.fistClick) {
-      game.generateMines(block);
-    }
-
-    if (!block.revealed) {
-      state.block[block.y][block.x].revealed = true;
-      game.revealEmptyBlocks(block);
-      setState({ ...state });
-    }
-
-    game.checkGameState();
-
-    if (block.mine) {
-      setTimeout(() => {
-        alert('游戏结束');
-      });
-      return;
-    }
+  const onclick = (block: BlockState) => {
+    winRitual();
+    game.handleBlockClick(block);
+    setState({ ...game.state });
   };
 
-  const handleContextMenu = (e: React.MouseEvent, block: BlockState) => {
+  const onContextMenu = (e: React.MouseEvent, block: BlockState) => {
     e.preventDefault();
-    state.block[block.y][block.x].flagged = !block.flagged;
-    setState({ ...state });
-    game.checkGameState();
+    game.handleContextMenu(block);
+    setState({ ...game.state });
+  };
+
+  const onDoubleClick = (block: BlockState) => {
+    game.autoExpand(block);
+    setState({ ...game.state });
   };
 
   const handleContent = (block: BlockState): React.ReactNode => {
@@ -65,17 +55,18 @@ const index = memo(() => {
     if (!block.revealed) {
       return 'bg-gray-400/30 hover:bg-gray-400/50';
     }
-    return block.mine ? 'bg-red-400/30' : numberColor[block.adjacentMines];
+    return block.mine ? 'bg-red-600/30' : numberColor[block.adjacentMines];
   };
 
   const setBlockButtons = (block: BlockState) => {
     return (
       <button
         key={block.x}
-        className={`flex justify-center items-center w-9 h-9 m-0.5 border text-center  dark:border-gray-400/30 
+        className={`flex justify-center items-center w-9 h-9 m-0.5 border text-center border-gray-400/30 
         ${setClassName(block)} `}
-        onClick={() => handleBlockClick(block)}
-        onContextMenu={(e) => handleContextMenu(e, block)}
+        onClick={() => onclick(block)}
+        onContextMenu={(e) => onContextMenu(e, block)}
+        onDoubleClick={() => onDoubleClick(block)}
       >
         {handleContent(block)}
       </button>
@@ -89,25 +80,24 @@ const index = memo(() => {
         game.reset();
         break;
       case 'easy':
-        game.reset(9, 9);
+        game.reset(9, 9, 10);
         break;
       case 'medium':
-        game.reset(16, 16);
+        game.reset(16, 16, 40);
         break;
       case 'hard':
-        game.reset(30, 16);
+        game.reset(30, 16, 99);
         break;
       default:
         game.reset();
         break;
     }
-    setState(game.state);
+    setState({ ...game.state });
   };
 
   return (
-    <main className="h-screen overflow-auto bg-white dark:bg-black font-sans p-8 text-center text-gray-700 dark:text-white">
+    <main className="h-screen overflow-auto bg-light dark:bg-dark font-sans p-8 text-center text-white">
       <h1 className="text-4xl font-bold">mine-sweeper</h1>
-      {console.log('render')}
       <div className="flex justify-center gap-1 p-3">
         <button className="btn" onClick={() => adjustmentLevel('reset')}>
           New Game
@@ -121,6 +111,12 @@ const index = memo(() => {
         <button className="btn" onClick={() => adjustmentLevel('hard')}>
           Hard
         </button>
+      </div>
+
+      <div className="flex justify-center">
+        <div className="flex justify-center items-center gap-2 text-3xl">
+          <IcBaselineAcUnit /> {game.mineReset()}
+        </div>
       </div>
 
       <div className="p-5">
